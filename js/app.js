@@ -37,6 +37,56 @@ const exportCsvBtn = document.getElementById('export-csv-btn');
 const tabBtns = document.querySelectorAll('.tab-btn');
 const tabContents = document.querySelectorAll('.tab-content');
 
+// 格式化数字
+function formatNumber(number) {
+    return number.toLocaleString();
+}
+
+// 格式化日期
+function formatDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+// 显示加载状态
+function showLoading(element) {
+    element.classList.add('loading');
+    element.classList.remove('no-results', 'has-results');
+    element.textContent = '查询中...';
+}
+
+// 显示查询结果
+function showResult(element, hasResults) {
+    element.classList.remove('loading');
+    
+    if (hasResults) {
+        element.classList.add('has-results');
+        element.classList.remove('no-results');
+    } else {
+        element.classList.add('no-results');
+        element.classList.remove('has-results');
+    }
+}
+
+// 导出为CSV
+function exportToCSV(data, filename) {
+    const header = Object.keys(data[0]).join(',');
+    const csv = [
+        header,
+        ...data.map(row => Object.values(row).join(','))
+    ].join('\r\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.setAttribute('href', url);
+    a.setAttribute('download', filename);
+    a.click();
+}
+
 // 初始化
 document.addEventListener('DOMContentLoaded', init);
 

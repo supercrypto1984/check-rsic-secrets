@@ -113,6 +113,7 @@ function setLanguage(lang) {
 
 // 更新所有文本
 function updateAllTexts() {
+  // 更新所有带有特定类的元素
   const elements = document.querySelectorAll(
     '[class*="-text"], [class*="-label"], [class*="-title"], [class*="-header"], [class*="-tab"]',
   )
@@ -128,6 +129,46 @@ function updateAllTexts() {
       }
     }
   })
+
+  // 直接更新初始消息元素
+  const initialMessages = document.querySelectorAll(".initial-message p")
+  initialMessages.forEach((el) => {
+    if (currentLang === "zh") {
+      el.textContent = translations.zh.pleaseEnterAddress
+    } else {
+      el.textContent = translations.en.pleaseEnterAddress
+    }
+  })
+
+  // 更新批量查询的初始消息
+  const batchInitialMessage = document.querySelector("#batch-tab .initial-message p")
+  if (batchInitialMessage) {
+    if (currentLang === "zh") {
+      batchInitialMessage.textContent = translations.zh.batchPleaseEnterAddress
+    } else {
+      batchInitialMessage.textContent = translations.en.batchPleaseEnterAddress
+    }
+  }
+
+  // 更新无结果消息
+  const noResults = document.querySelectorAll(".no-result p")
+  noResults.forEach((el) => {
+    if (currentLang === "zh") {
+      el.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + translations.zh.noMatchText
+    } else {
+      el.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + translations.en.noMatchText
+    }
+  })
+
+  // 更新批量查询的无结果消息
+  const batchNoResult = document.querySelector("#batch-tab .no-result p")
+  if (batchNoResult) {
+    if (currentLang === "zh") {
+      batchNoResult.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + translations.zh.batchNoMatchText
+    } else {
+      batchNoResult.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + translations.en.batchNoMatchText
+    }
+  }
 }
 
 // 将类名转换为翻译键

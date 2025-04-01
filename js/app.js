@@ -3,7 +3,7 @@
  */
 
 // 数据URL
-const DATA_URL = "https://rsic.4everland.store/wallet_data.json"
+const DATA_URL = "wallet_data.json"
 
 // 全局变量
 let walletData = []
@@ -147,31 +147,42 @@ function setupEventListeners() {
   exportCsvBtn.addEventListener("click", exportBatchResults)
 }
 
-// 初始化Web Worker
+// 修改Web Worker初始化，确保正确的路径
 function initWorker() {
-  dataWorker = new Worker("js/data-worker.js")
+  try {
+    dataWorker = new Worker("./js/data-worker.js")
 
-  dataWorker.addEventListener("message", (e) => {
-    const { type, data } = e.data
+    dataWorker.addEventListener("message", (e) => {
+      const { type, data } = e.data
 
-    switch (type) {
-      case "progress":
-        updateProgress(data.progress)
-        break
-      case "load-complete":
-        handleDataLoaded(data)
-        break
-      case "search-complete":
-        handleSearchComplete(data)
-        break
-      case "batch-search-complete":
-        handleBatchSearchComplete(data)
-        break
-      case "error":
-        handleError(data.message)
-        break
-    }
-  })
+      switch (type) {
+        case "progress":
+          updateProgress(data.progress)
+          break
+        case "load-complete":
+          handleDataLoaded(data)
+          break
+        case "search-complete":
+          handleSearchComplete(data)
+          break
+        case "batch-search-complete":
+          handleBatchSearchComplete(data)
+          break
+        case "error":
+          handleError(data.message)
+          break
+      }
+    })
+
+    // 添加错误处理
+    dataWorker.addEventListener("error", (e) => {
+      handleError("Worker错误: " + e.message)
+    })
+  } catch (error) {
+    handleError("无法创建Web Worker: " + error.message)
+    // 回退到主线程加载
+    loadDataFallback()
+  }
 }
 
 // 加载数据
@@ -185,6 +196,73 @@ function loadData() {
     type: "load",
     data: { url: DATA_URL },
   })
+}
+
+// 添加回退加载函数
+async function loadDataFallback() {
+  try {
+    dataStatus.textContent = "正在加载(回退模式)..."
+    document.getElementById("debug-info").textContent = "使用回退模式加载数据..."
+
+    const response = await fetch(DATA_URL)
+    if (!response.ok) {
+      throw new Error(`HTTP错误: ${response.status}`)
+    }
+
+    const text = await response.text()
+    let walletData
+
+    try {
+      walletData = JSON.parse(text)
+
+      // 确保数据是数组
+      if (!Array.isArray(walletData)) {
+        walletData = [walletData]
+      }
+
+      // 处理数据格式
+      walletData = walletData
+        .map((item) => {
+          if (typeof item === "string") {
+            try {
+              item = JSON.parse(item)
+            } catch (e) {
+              item = {}
+            }
+          }
+
+          return {
+            address: item.address || "",
+            secrets: item.secrets || 0,
+          }
+        })
+        .filter((item) => item.address)
+
+      // 创建索引
+      const addressIndex = {}
+      for (let i = 0; i < walletData.length; i++) {
+        addressIndex[walletData[i].address.toLowerCase()] = i
+      }
+
+      // 更新全局变量
+      window.walletData = walletData
+      window.addressIndex = addressIndex
+      isDataLoaded = true
+
+      // 更新UI
+      dataStatus.textContent = "已加载完成(回退模式)"
+      totalAddresses.textContent = formatNumber(walletData.length)
+      lastUpdated.textContent = formatDate(new Date())
+      document.getElementById("debug-info").textContent = `回退模式: 成功加载 ${walletData.length} 条记录。`
+
+      // 隐藏加载界面
+      loadingOverlay.style.display = "none"
+    } catch (error) {
+      throw new Error("解析JSON失败: " + error.message)
+    }
+  } catch (error) {
+    handleError(error.message)
+  }
 }
 
 // 更新进度
@@ -204,19 +282,26 @@ function handleDataLoaded(data) {
   totalAddresses.textContent = formatNumber(data.count)
   lastUpdated.textContent = formatDate(new Date())
 
+  // 添加调试信息
+  document.getElementById("debug-info").textContent = `成功加载 ${data.count} 条记录。第一条: ${
+    data.walletData.length > 0 ? JSON.stringify(data.walletData[0]).substring(0, 50) + "..." : "无数据"
+  }`
+
   // 隐藏加载界面
   loadingOverlay.style.display = "none"
 }
 
-// 处理错���
+// 添加调试功能
 function handleError(message) {
   console.error("错误:", message)
   dataStatus.textContent = "加载失败"
-  loadingOverlay.style.display = "none"
+  document.getElementById("debug-info").textContent = "错误: " + message
+  // 不要隐藏加载界面，以便用户可以看到错误信息
+  // loadingOverlay.style.display = 'none';
   alert(`操作失败: ${message}`)
 }
 
-// 执行单个地址查询
+// 修改单个查询函数，添加回退模式支持
 function performSingleSearch() {
   const searchTerm = singleSearch.value.trim()
 
@@ -238,17 +323,44 @@ function performSingleSearch() {
   }
 
   // 显示加载状态
-  showLoading(singleResult)
+  const loadingContainer = singleResult.querySelector(".loading-container")
+  const resultContent = singleResult.querySelector(".result-content")
+  const noResult = singleResult.querySelector(".no-result")
+  const initialMessage = singleResult.querySelector(".initial-message")
 
-  // 使用Web Worker搜索
-  dataWorker.postMessage({
-    type: "search",
-    data: {
-      address: searchTerm,
-      walletData,
-      addressIndex,
-    },
-  })
+  if (loadingContainer) loadingContainer.style.display = "flex"
+  if (resultContent) resultContent.style.display = "none"
+  if (noResult) noResult.style.display = "none"
+  if (initialMessage) initialMessage.style.display = "none"
+
+  // 如果Worker可用，使用Worker搜索
+  if (dataWorker) {
+    dataWorker.postMessage({
+      type: "search",
+      data: {
+        address: searchTerm,
+        walletData,
+        addressIndex,
+      },
+    })
+  } else {
+    // 回退模式：在主线程中搜索
+    setTimeout(() => {
+      const lowerAddress = searchTerm.toLowerCase()
+      const index = addressIndex[lowerAddress]
+
+      let result = null
+      if (index !== undefined) {
+        result = walletData[index]
+      }
+
+      // 缓存结果
+      searchCache.set(lowerAddress, result)
+
+      // 显示结果
+      displaySingleResult(result)
+    }, 100)
+  }
 }
 
 // 处理搜索完成
@@ -266,20 +378,31 @@ function handleSearchComplete(data) {
   displaySingleResult(result)
 }
 
-// 显示单个查询结果
+// 修改显示单个查询结果函数
 function displaySingleResult(result) {
+  const loadingContainer = singleResult.querySelector(".loading-container")
+  const resultContent = singleResult.querySelector(".result-content")
+  const noResult = singleResult.querySelector(".no-result")
+  const initialMessage = singleResult.querySelector(".initial-message")
+
+  if (loadingContainer) loadingContainer.style.display = "none"
+  if (initialMessage) initialMessage.style.display = "none"
+
   if (result) {
     // 显示结果
     resultAddress.textContent = result.address
     resultSecrets.textContent = formatNumber(result.secrets)
-    showResult(singleResult, true)
+
+    if (resultContent) resultContent.style.display = "block"
+    if (noResult) noResult.style.display = "none"
   } else {
     // 显示无结果
-    showResult(singleResult, false)
+    if (resultContent) resultContent.style.display = "none"
+    if (noResult) noResult.style.display = "block"
   }
 }
 
-// 执行批量地址查询
+// 修改批量查询函数，添加回退模式支持
 function performBatchSearch() {
   const addressesText = batchAddresses.value.trim()
 
@@ -305,20 +428,81 @@ function performBatchSearch() {
   }
 
   // 显示加载状态
-  showLoading(batchResult)
+  const loadingContainer = batchResult.querySelector(".loading-container")
+  const resultContent = batchResult.querySelector(".result-content")
+  const noResult = batchResult.querySelector(".no-result")
+  const initialMessage = batchResult.querySelector(".initial-message")
+
+  if (loadingContainer) loadingContainer.style.display = "flex"
+  if (resultContent) resultContent.style.display = "none"
+  if (noResult) noResult.style.display = "none"
+  if (initialMessage) initialMessage.style.display = "none"
 
   // 清空之前的结果缓存
   batchResultsCache.length = 0
 
-  // 使用Web Worker批量搜索
-  dataWorker.postMessage({
-    type: "batch-search",
-    data: {
-      addresses: addressList,
-      walletData,
-      addressIndex,
-    },
-  })
+  // 如果Worker可用，使用Worker搜索
+  if (dataWorker) {
+    dataWorker.postMessage({
+      type: "batch-search",
+      data: {
+        addresses: addressList,
+        walletData,
+        addressIndex,
+      },
+    })
+  } else {
+    // 回退模式：在主线程中搜索
+    setTimeout(() => {
+      const results = []
+
+      for (const address of addressList) {
+        const lowerAddress = address.toLowerCase()
+        const index = addressIndex[lowerAddress]
+
+        if (index !== undefined) {
+          results.push(walletData[index])
+        }
+      }
+
+      // 缓存结果
+      batchResultsCache.push(...results)
+
+      // 显示结果
+      if (results.length > 0) {
+        // 更新结果计数
+        batchCount.textContent = `(${results.length}/${addressList.length})`
+
+        // 清空表格
+        batchResultsBody.innerHTML = ""
+
+        // 填充表格
+        results.forEach((item) => {
+          const row = document.createElement("tr")
+
+          const addressCell = document.createElement("td")
+          addressCell.textContent = item.address
+
+          const secretsCell = document.createElement("td")
+          secretsCell.textContent = formatNumber(item.secrets)
+
+          row.appendChild(addressCell)
+          row.appendChild(secretsCell)
+          batchResultsBody.appendChild(row)
+        })
+
+        // 显示结果
+        if (loadingContainer) loadingContainer.style.display = "none"
+        if (resultContent) resultContent.style.display = "block"
+        if (noResult) noResult.style.display = "none"
+      } else {
+        // 显示无结果
+        if (loadingContainer) loadingContainer.style.display = "none"
+        if (resultContent) resultContent.style.display = "none"
+        if (noResult) noResult.style.display = "block"
+      }
+    }, 100)
+  }
 }
 
 // 处理批量搜索完成

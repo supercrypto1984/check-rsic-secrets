@@ -66,25 +66,59 @@ async function loadData(url) {
     // 转换为文本
     const text = new TextDecoder("utf-8").decode(chunksAll)
 
+    // 修改loadData函数中的解析逻辑，确保能正确处理您的JSON格式
+    // 在loadData函数中，找到解析JSON的部分，替换为:
+
     // 解析JSON
-    const walletData = JSON.parse(text)
+    let walletData
+    try {
+      walletData = JSON.parse(text)
 
-    // 创建地址索引
-    const addressIndex = {}
-    for (let i = 0; i < walletData.length; i++) {
-      const item = walletData[i]
-      addressIndex[item.address.toLowerCase()] = i
+      // 检查数据格式，确保它是数组
+      if (!Array.isArray(walletData)) {
+        // 如果不是数组，尝试将其作为单个对象处理
+        walletData = [walletData]
+      }
+
+      // 确保每个项目都有address和secrets属性
+      walletData = walletData
+        .map((item) => {
+          // 如果是字符串，尝试解析
+          if (typeof item === "string") {
+            try {
+              item = JSON.parse(item)
+            } catch (e) {
+              // 如果解析失败，创建一个空对象
+              item = {}
+            }
+          }
+
+          return {
+            address: item.address || "",
+            secrets: item.secrets || 0,
+          }
+        })
+        .filter((item) => item.address) // 过滤掉没有地址的项目
+
+      // 创建地址索引
+      const addressIndex = {}
+      for (let i = 0; i < walletData.length; i++) {
+        const item = walletData[i]
+        addressIndex[item.address.toLowerCase()] = i
+      }
+
+      // 发送数据
+      self.postMessage({
+        type: "load-complete",
+        data: {
+          walletData,
+          addressIndex,
+          count: walletData.length,
+        },
+      })
+    } catch (error) {
+      self.postMessage({ type: "error", data: { message: "解析JSON失败: " + error.message } })
     }
-
-    // 发送数据
-    self.postMessage({
-      type: "load-complete",
-      data: {
-        walletData,
-        addressIndex,
-        count: walletData.length,
-      },
-    })
   } catch (error) {
     self.postMessage({ type: "error", data: { message: error.message } })
   }

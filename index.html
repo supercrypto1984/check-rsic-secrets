@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>钱包地址查询工具</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1><i class="fas fa-wallet"></i> 钱包地址查询工具</h1>
+        </div>
+    </header>
+    
+    <main class="container">
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="single">单个地址查询</button>
+            <button class="tab-btn" data-tab="batch">批量地址查询</button>
+        </div>
+        
+        <div class="tab-content active" id="single-tab">
+            <div class="search-box">
+                <input type="text" id="single-search" placeholder="输入钱包地址..." autocomplete="off">
+                <button id="single-search-btn"><i class="fas fa-search"></i> 查询</button>
+            </div>
+            
+            <div id="single-result" class="result-box">
+                <div class="loading-container">
+                    <div class="loading-spinner"></div>
+                    <p>正在加载数据，请稍候...</p>
+                </div>
+                <div class="result-content" style="display: none;">
+                    <h3>查询结果</h3>
+                    <div class="result-details">
+                        <p>地址: <span id="result-address"></span></p>
+                        <p>秘密数量: <span id="result-secrets"></span></p>
+                    </div>
+                </div>
+                <div class="no-result" style="display: none;">
+                    <p><i class="fas fa-exclamation-circle"></i> 未找到匹配的地址</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="batch-tab">
+            <div class="batch-input">
+                <textarea id="batch-addresses" placeholder="输入多个钱包地址，每行一个..."></textarea>
+                <div class="batch-controls">
+                    <button id="batch-search-btn"><i class="fas fa-search"></i> 批量查询</button>
+                    <button id="clear-batch-btn"><i class="fas fa-trash"></i> 清空</button>
+                </div>
+            </div>
+            
+            <div id="batch-result" class="result-box">
+                <div class="loading-container">
+                    <div class="loading-spinner"></div>
+                    <p>正在加载数据，请稍候...</p>
+                </div>
+                <div class="result-content" style="display: none;">
+                    <h3>批量查询结果 <span id="batch-count">(0)</span></h3>
+                    <div class="batch-actions">
+                        <button id="export-csv-btn"><i class="fas fa-file-export"></i> 导出CSV</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="batch-results-table">
+                            <thead>
+                                <tr>
+                                    <th>钱包地址</th>
+                                    <th>秘密数量</th>
+                                </tr>
+                            </thead>
+                            <tbody id="batch-results-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="no-result" style="display: none;">
+                    <p><i class="fas fa-exclamation-circle"></i> 未找到匹配的地址</p>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <footer>
+        <div class="container">
+            <p>数据状态: <span id="data-status">加载中...</span></p>
+            <p>总地址数: <span id="total-addresses">0</span></p>
+            <p>最后更新: <span id="last-updated">-</span></p>
+        </div>
+    </footer>
+    
+    <div id="loading-overlay">
+        <div class="loading-content">
+            <div class="loading-spinner large"></div>
+            <p>正在加载数据库...</p>
+            <div class="progress-bar-container">
+                <div id="progress-bar" class="progress-bar"></div>
+            </div>
+            <p id="progress-text">0%</p>
+        </div>
+    </div>
+    
+    <script src="js/utils.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

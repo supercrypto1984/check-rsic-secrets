@@ -27,9 +27,9 @@
             </div>
             
             <div id="single-result" class="result-box">
-                <div class="loading-container">
+                <div class="loading-container" style="display: none;">
                     <div class="loading-spinner"></div>
-                    <p>正在加载数据，请稍候...</p>
+                    <p>查询中...</p>
                 </div>
                 <div class="result-content" style="display: none;">
                     <h3>查询结果</h3>
@@ -40,6 +40,9 @@
                 </div>
                 <div class="no-result" style="display: none;">
                     <p><i class="fas fa-exclamation-circle"></i> 未找到匹配的地址</p>
+                </div>
+                <div class="initial-message">
+                    <p>请输入钱包地址进行查询</p>
                 </div>
             </div>
         </div>
@@ -54,9 +57,9 @@
             </div>
             
             <div id="batch-result" class="result-box">
-                <div class="loading-container">
+                <div class="loading-container" style="display: none;">
                     <div class="loading-spinner"></div>
-                    <p>正在加载数据，请稍候...</p>
+                    <p>查询中...</p>
                 </div>
                 <div class="result-content" style="display: none;">
                     <h3>批量查询结果 <span id="batch-count">(0)</span></h3>
@@ -77,6 +80,9 @@
                 </div>
                 <div class="no-result" style="display: none;">
                     <p><i class="fas fa-exclamation-circle"></i> 未找到匹配的地址</p>
+                </div>
+                <div class="initial-message">
+                    <p>请输入钱包地址进行批量查询</p>
                 </div>
             </div>
         </div>
@@ -102,6 +108,8 @@
     </div>
     
     <script src="js/utils.js"></script>
+    <script src="js/data-worker.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
+

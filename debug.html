@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON数据调试工具</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #3498db;
+        }
+        .debug-panel {
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .result-panel {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            min-height: 200px;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            width: 300px;
+            margin-right: 10px;
+        }
+        pre {
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            overflow: auto;
+            max-height: 400px;
+        }
+        .status {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .success {
+            color: #2ecc71;
+        }
+        .error {
+            color: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <h1>JSON数据调试工具</h1>
+    
+    <div class="debug-panel">
+        <div class="status" id="status">状态: 等待操作</div>
+        <button id="load-json">加载JSON文件</button>
+        <button id="check-structure">检查数据结构</button>
+        <button id="create-index">创建索引</button>
+        <div>
+            <input type="text" id="search-input" placeholder="输入钱包地址...">
+            <button id="search-address">搜索地址</button>
+        </div>
+    </div>
+    
+    <div class="result-panel">
+        <h2>结果</h2>
+        <pre id="result">等待操作...</pre>
+    </div>
+    
+    <script>
+        // 全局变量
+        let walletData = [];
+        let addressIndex = {};
+        
+        // DOM元素
+        const statusEl = document.getElementById('status');
+        const resultEl = document.getElementById('result');
+        const loadJsonBtn = document.getElementById('load-json');
+        const checkStructureBtn = document.getElementById('check-structure');
+        const createIndexBtn = document.getElementById('create-index');
+        const searchInput = document.getElementById('search-input');
+        const searchAddressBtn = document.getElementById('search-address');
+        
+        // 设置状态
+        function setStatus(message, isError = false) {
+            statusEl.textContent = '状态: ' + message;
+            statusEl.className = isError ? 'status error' : 'status success';
+        }
+        
+        // 显示结果
+        function showResult(data) {
+            if (typeof data === 'object') {
+                resultEl.textContent = JSON.stringify(data, null, 2);
+            } else {
+                resultEl.textContent = data;
+            }
+        }
+        
+        // 加载JSON文件
+        async function loadJsonFile() {
+            try {
+                setStatus('正在加载JSON文件...');
+                showResult('加载中...');
+                
+                const response = await fetch('wallet_data.json');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP错误: ${response.status}`);
+                }
+                
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    showResult(`警告: 服务器返回的内容类型不是JSON (${contentType})\n继续尝试解析...`);
+                }
+                
+                const text = await response.text();
+                
+                try {
+                    walletData = JSON.parse(text);
+                    setStatus('JSON文件加载成功');
+                    showResult(`成功加载JSON数据，长度: ${text.length} 字符\n\n前100个字符预览:\n${text.substring(0, 100)}...`);
+                } catch (parseError) {
+                    setStatus('JSON解析失败', true);
+                    showResult(`JSON解析错误: ${parseError.message}\n\n前100个字符预览:\n${text.substring(0, 100)}...`);
+                }
+            } catch (error) {
+                setStatus('加载失败', true);
+                showResult(`加载错误: ${error.message}`);
+            }
+        }
+        
+        // 检查数据结构
+        function checkDataStructure() {
+            try {
+                if (!walletData) {
+                    setStatus('没有数据可检查', true);
+                    showResult('请先加载JSON文件');
+                    return;
+                }
+                
+                const isArray = Array.isArray(walletData);
+                const length = isArray ? walletData.length : 1;
+                const type = typeof walletData;
+                
+                let structureInfo = `数据类型: ${type}\n`;
+                structureInfo += `是否为数组: ${isArray}\n`;
+                structureInfo += `数据长度/大小: ${length}\n\n`;
+                
+                if (isArray && length > 0) {
+                    structureInfo += `第一个元素:\n${JSON.stringify(walletData[0], null, 2)}\n\n`;
+                    
+                    if (length > 1) {
+                        structureInfo += `第二个元素:\n${JSON.stringify(walletData[1], null, 2)}\n\n`;
+                    }
+                    
+                    // 检查是否每个元素都有address属性
+                    const hasAddressProperty = walletData.every(item => item && typeof item === 'object' && 'address' in item);
+                    structureInfo += `所有元素都有address属性: ${hasAddressProperty}\n`;
+                    
+                    // 检查是否每个元素都有secrets属性
+                    const hasSecretsProperty = walletData.every(item => item && typeof item === 'object' && 'secrets' in item);
+                    structureInfo += `所有元素都有secrets属性: ${hasSecretsProperty}\n`;
+                    
+                    // 随机抽查几个元素
+                    structureInfo += `\n随机抽查:\n`;
+                    for (let i = 0; i < 3; i++) {
+                        const randomIndex = Math.floor(Math.random() * length);
+                        structureInfo += `索引 ${randomIndex}: ${JSON.stringify(walletData[randomIndex])}\n`;
+                    }
+                } else if (!isArray) {
+                    structureInfo += `数据内容:\n${JSON.stringify(walletData, null, 2)}\n`;
+                }
+                
+                setStatus('数据结构检查完成');
+                showResult(structureInfo);
+            } catch (error) {
+                setStatus('检查失败', true);
+                showResult(`检查错误: ${error.message}`);
+            }
+        }
+        
+        // 创建索引
+        function createIndex() {
+            try {
+                if (!walletData || !Array.isArray(walletData)) {
+                    setStatus('无法创建索引', true);
+                    showResult('数据不是数组，无法创建索引');
+                    return;
+                }
+                
+                addressIndex = {};
+                let indexedCount = 0;
+                let missingAddressCount = 0;
+                
+                for (let i = 0; i < walletData.length; i++) {
+                    const item = walletData[i];
+                    
+                    if (item && typeof item === 'object' && item.address) {
+                        addressIndex[item.address.toLowerCase()] = i;
+                        indexedCount++;
+                    } else {
+                        missingAddressCount++;
+                    }
+                }
+                
+                setStatus('索引创建完成');
+                showResult(`成功创建索引\n已索引: ${indexedCount} 条记录\n缺少地址: ${missingAddressCount} 条记录\n\n索引大小: ${Object.keys(addressIndex).length} 个键`);
+            } catch (error) {
+                setStatus('索引创建失败', true);
+                showResult(`创建索引错误: ${error.message}`);
+            }
+        }
+        
+        // 搜索地址
+        function searchAddress() {
+            try {
+                const searchTerm = searchInput.value.trim();
+                
+                if (!searchTerm) {
+                    setStatus('请输入搜索地址', true);
+                    showResult('搜索地址不能为空');
+                    return;
+                }
+                
+                if (Object.keys(addressIndex).length === 0) {
+                    setStatus('索引未创建', true);
+                    showResult('请先创建索引');
+                    return;
+                }
+                
+                const lowerAddress = searchTerm.toLowerCase();
+                const index = addressIndex[lowerAddress];
+                
+                if (index !== undefined) {
+                    const result = walletData[index];
+                    setStatus('找到匹配记录');
+                    showResult(`找到匹配记录:\n${JSON.stringify(result, null, 2)}`);
+                } else {
+                    setStatus('未找到匹配记录', true);
+                    showResult(`未找到地址: ${searchTerm}`);
+                    
+                    // 尝试部分匹配
+                    const partialMatches = Object.keys(addressIndex).filter(addr => addr.includes(lowerAddress));
+                    if (partialMatches.length > 0) {
+                        let partialInfo = `找到 ${partialMatches.length} 个部分匹配:\n`;
+                        partialMatches.slice(0, 5).forEach(addr => {
+                            const idx = addressIndex[addr];
+                            partialInfo += `- ${addr}: ${JSON.stringify(walletData[idx])}\n`;
+                        });
+                        if (partialMatches.length > 5) {
+                            partialInfo += `... 还有 ${partialMatches.length - 5} 个匹配未显示`;
+                        }
+                        showResult(partialInfo);
+                    }
+                }
+            } catch (error) {
+                setStatus('搜索失败', true);
+                showResult(`搜索错误: ${error.message}`);
+            }
+        }
+        
+        // 事件监听
+        loadJsonBtn.addEventListener('click', loadJsonFile);
+        checkStructureBtn.addEventListener('click', checkDataStructure);
+        createIndexBtn.addEventListener('click', createIndex);
+        searchAddressBtn.addEventListener('click', searchAddress);
+        searchInput.addEventListener('keypress', e => {
+            if (e.key === 'Enter') searchAddress();
+        });
+    </script>
+</body>
+</html>
